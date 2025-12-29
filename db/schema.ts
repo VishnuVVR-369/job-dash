@@ -1,7 +1,32 @@
 import { relations } from "drizzle-orm";
-import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
-export const user = pgTable("user", {
+export const applicationStatusEnum = pgEnum("application_status", [
+  "TO_APPLY",
+  "REFERRAL_REQUESTED",
+  "APPLIED",
+  "ONLINE_ASSESSMENT",
+  "TECHNICAL_INTERVIEW",
+  "SYSTEM_DESIGN",
+  "MANAGERIAL",
+  "OFFER",
+  "REJECTED",
+  "GHOSTED",
+  "WITHDRAWN",
+]);
+
+export const actionItemStatusEnum = pgEnum("action_item_status", [
+  "PENDING",
+  "COMPLETED",
+  "ARCHIVED",
+]);
+
+export const actionItemCreatedByEnum = pgEnum("action_item_created_by", [
+  "USER",
+  "SYSTEM",
+]);
+
+export const users = pgTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
@@ -28,7 +53,7 @@ export const session = pgTable(
     userAgent: text("user_agent"),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
   },
   (table) => [index("session_userId_idx").on(table.userId)],
 );
@@ -41,7 +66,7 @@ export const account = pgTable(
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
@@ -73,21 +98,85 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const userRelations = relations(user, ({ many }) => ({
+export const applications = pgTable("applications", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  companyName: text("company_name").notNull(),
+  role: text("role").notNull(),
+  location: text("location"),
+  jobUrl: text("job_url"),
+  source: text("source"),
+  status: applicationStatusEnum("status").default("TO_APPLY").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const applicationHistory = pgTable("application_history", {
+  id: text("id").primaryKey(),
+  applicationId: text("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
+  fromStatus: applicationStatusEnum("from_status").notNull(),
+  toStatus: applicationStatusEnum("to_status").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const referrals = pgTable("referrals", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  applicationId: text("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  source: text("source"),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const actionItems = pgTable("action_items", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  applicationId: text("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
+  referralId: text("referral_id"),
+  title: text("title").notNull(),
+  body: text("body"),
+  dueDate: timestamp("due_date"),
+  status: actionItemStatusEnum("status").default("PENDING").notNull(),
+  createdBy: actionItemCreatedByEnum("created_by").default("SYSTEM").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const userRelations = relations(users, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
-  user: one(user, {
+  user: one(users, {
     fields: [session.userId],
-    references: [user.id],
+    references: [users.id],
   }),
 }));
 
 export const accountRelations = relations(account, ({ one }) => ({
-  user: one(user, {
+  user: one(users, {
     fields: [account.userId],
-    references: [user.id],
+    references: [users.id],
   }),
 }));
