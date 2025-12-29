@@ -15,7 +15,7 @@
       "!build",
       "!components/ui",
       "!app/page.tsx",
-      "!db/migrations/**"
+      "!db/migrations"
     ]
   },
   "formatter": {
