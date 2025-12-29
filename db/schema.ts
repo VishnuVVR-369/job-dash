@@ -1,5 +1,12 @@
 import { relations } from "drizzle-orm";
-import { boolean, index, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 export const applicationStatusEnum = pgEnum("application_status", [
   "TO_APPLY",
@@ -26,7 +33,7 @@ export const actionItemCreatedByEnum = pgEnum("action_item_created_by", [
   "SYSTEM",
 ]);
 
-export const users = pgTable("users", {
+export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
@@ -53,7 +60,7 @@ export const session = pgTable(
     userAgent: text("user_agent"),
     userId: text("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => user.id, { onDelete: "cascade" }),
   },
   (table) => [index("session_userId_idx").on(table.userId)],
 );
@@ -66,7 +73,7 @@ export const account = pgTable(
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => user.id, { onDelete: "cascade" }),
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
@@ -102,7 +109,7 @@ export const applications = pgTable("applications", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => user.id, { onDelete: "cascade" }),
   companyName: text("company_name").notNull(),
   role: text("role").notNull(),
   location: text("location"),
@@ -119,7 +126,9 @@ export const applications = pgTable("applications", {
 
 export const applicationHistory = pgTable("application_history", {
   id: text("id").primaryKey(),
-  applicationId: text("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
+  applicationId: text("application_id")
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
   fromStatus: applicationStatusEnum("from_status").notNull(),
   toStatus: applicationStatusEnum("to_status").notNull(),
   notes: text("notes"),
@@ -130,8 +139,10 @@ export const referrals = pgTable("referrals", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  applicationId: text("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
+    .references(() => user.id, { onDelete: "cascade" }),
+  applicationId: text("application_id")
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   source: text("source"),
   requestedAt: timestamp("requested_at").defaultNow().notNull(),
@@ -147,8 +158,10 @@ export const actionItems = pgTable("action_items", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  applicationId: text("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
+    .references(() => user.id, { onDelete: "cascade" }),
+  applicationId: text("application_id")
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
   referralId: text("referral_id"),
   title: text("title").notNull(),
   body: text("body"),
@@ -162,21 +175,66 @@ export const actionItems = pgTable("action_items", {
     .notNull(),
 });
 
-export const userRelations = relations(users, ({ many }) => ({
+export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [session.userId],
-    references: [users.id],
+    references: [user.id],
   }),
 }));
 
 export const accountRelations = relations(account, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [account.userId],
-    references: [users.id],
+    references: [user.id],
+  }),
+}));
+
+export const applicationsRelations = relations(
+  applications,
+  ({ one, many }) => ({
+    user: one(user, {
+      fields: [applications.userId],
+      references: [user.id],
+    }),
+    referrals: many(referrals),
+    applicationHistory: many(applicationHistory),
+    actionItems: many(actionItems),
+  }),
+);
+
+export const referralsRelations = relations(referrals, ({ one }) => ({
+  user: one(user, {
+    fields: [referrals.userId],
+    references: [user.id],
+  }),
+  application: one(applications, {
+    fields: [referrals.applicationId],
+    references: [applications.id],
+  }),
+}));
+
+export const applicationHistoryRelations = relations(
+  applicationHistory,
+  ({ one }) => ({
+    application: one(applications, {
+      fields: [applicationHistory.applicationId],
+      references: [applications.id],
+    }),
+  }),
+);
+
+export const actionItemsRelations = relations(actionItems, ({ one }) => ({
+  user: one(user, {
+    fields: [actionItems.userId],
+    references: [user.id],
+  }),
+  application: one(applications, {
+    fields: [actionItems.applicationId],
+    references: [applications.id],
   }),
 }));
