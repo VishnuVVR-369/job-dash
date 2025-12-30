@@ -40,6 +40,7 @@ export const columns: ColumnDef<Application>[] = [
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => <StatusBadge status={row.getValue("status")} />,
+    filterFn: "equals",
   },
   {
     accessorKey: "createdAt",
